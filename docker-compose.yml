@@ -1,0 +1,23 @@
+version: '2'
+services:
+  kafka:
+    build: ./kafka
+    ports:
+      - "9092:9092"
+      - "2181:2181"
+    hostname: kafka
+    expose:
+      - "9092"
+      - "2181"
+    environment:
+    - "ADVERTISED_HOST=127.0.0.3"
+    - "ADVERTISED_PORT=9092"
+    external_links:
+      - ctlab_ctdatabase_1
+    networks:
+      - default
+      - ctlab_default
+networks:
+  ctlab_default:
+    external: true
+
