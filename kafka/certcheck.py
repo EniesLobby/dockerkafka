@@ -11,27 +11,12 @@ import requests
 def main(args):
 	
 	url = "https://www.ct-observatory.org/checkcertserial"
-	
-	##CSRF####
-	client = requests.session()
-	client.get(url)
-	
-	if 'csrftoken' in client.cookies:
-		csrftoken = client.cookies['csrftoken']
-		print(csrftoken)
-	##########
-	
-	payload = {'serial': 'FAFA52525252FF22', 'csrfmiddlewaretoken': csrftoken }
-	
-	#r = requests.post(url, payload, headers={'Referer': 'www.yandex.ru'})
-	r = client.post(url, data=payload, headers={'Referer': url})
-	
-	print(r.text)
-	
+
 	try:
 		con = KafkaConsumer(bootstrap_servers="localhost:9092")
 	except:
 		print("No Brokers Available")
+		exit()
 	
 	con.assign([TopicPartition('certs', 0)])
 	con.seek_to_beginning()
@@ -39,10 +24,23 @@ def main(args):
 	
 	for msg in con:		
 		current_time = str(datetime.datetime.now())	
-		data = json.loads(msg.value.decode('utf-8'))
-		serial = data['serial'] + "-" + data['commonName']
+		data = json.loads(msg.value.decode('utf-8'))		
+		
+		##CSRF####
+		client = requests.session()
+		client.get(url)
+		
+		if 'csrftoken' in client.cookies:
+			csrftoken = client.cookies['csrftoken']
+		##########
+		
+		payload = {'serial': data['serial'], 'csrfmiddlewaretoken': csrftoken }
+		r = client.post(url, data=payload, headers={'Referer': url})
+		if(r.text == ""):
+			print(current_time, data['commonName'], "[x] NOT FOUND (!!!)")
+		else:
+			print(current_time, data['commonName'], "[x] FOUND")
 				
-		print(current_time, " [x] cert sent")
 
 
 if __name__ == "__main__":
