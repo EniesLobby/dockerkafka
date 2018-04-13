@@ -6,27 +6,18 @@ import sys
 import datetime
 import argparse
 import base64
-import requests
+import pika, os
+
+
+# Access the CLODUAMQP_URL environment variable and parse it (fallback to localhost)
+url = os.environ.get('CLOUDAMQP_URL', 'amqp://wpjjevki:f3XA0SBfcSjtmnNyTmtUYRdlwBKGc2WD@sheep.rmq.cloudamqp.com/wpjjevki')
+params = pika.URLParameters(url)
+connection = pika.BlockingConnection(params)
+channel = connection.channel() # start a channel
+channel.queue_declare(queue='certs') # Declare a queue
+
 
 def main(args):
-	
-	url = "https://www.ct-observatory.org/checkcertserial"
-	
-	##CSRF####
-	client = requests.session()
-	client.get(url)
-	
-	if 'csrftoken' in client.cookies:
-		csrftoken = client.cookies['csrftoken']
-		print(csrftoken)
-	##########
-	
-	payload = {'serial': 'FAFA52525252FF22', 'csrfmiddlewaretoken': csrftoken }
-	
-	#r = requests.post(url, payload, headers={'Referer': 'www.yandex.ru'})
-	r = client.post(url, data=payload, headers={'Referer': url})
-	
-	print(r.text)
 	
 	try:
 		con = KafkaConsumer(bootstrap_servers="localhost:9092")
@@ -37,11 +28,12 @@ def main(args):
 	con.seek_to_beginning()
 	print("Topics: ", con.topics())
 	
-	for msg in con:		
+	for msg in con:
+		
 		current_time = str(datetime.datetime.now())	
 		data = json.loads(msg.value.decode('utf-8'))
 		serial = data['serial'] + "-" + data['commonName']
-				
+		channel.basic_publish(exchange='', routing_key='certs', body=serial)
 		print(current_time, " [x] cert sent")
 
 
